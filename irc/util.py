@@ -21,7 +21,7 @@ def buildmsg(command, arg=None, payload=None):
     return msg.encode()
 
 def shortlink(url):
-    with open('config') as f:
+    with open('config.json') as f:
         config = json.loads(f.read())
     print("shortening %s" % url)
     api = "https://api-ssl.bitly.com/v3/shorten/"
