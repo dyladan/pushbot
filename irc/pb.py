@@ -14,10 +14,16 @@ def push_to_s(push):
     if push['type'] == 'note':
         return('<%s> %s' % (sender, push['body']))
     elif push['type'] == 'link':
-        title = push['title']
+        if 'title' in push:
+            title = push['title']
+        else:
+            title = ''
         url = push['url']
         shorturl = shortlink(url)
-        body = push['body']
+        if 'body' in push:
+            body = push['body']
+        else:
+            body = ''
         return('<%s> (%s) - %s - %s' % (sender, title, shorturl, body))
     elif push['type'] == 'file':
         filename = push['file_name']
