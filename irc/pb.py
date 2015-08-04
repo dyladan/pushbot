@@ -4,9 +4,7 @@ from irc.util import shortlink
 
 def get_pushes(ident, modified_after=0, active='true'):
     r = requests.get("https://api.pushbullet.com/v2/pushes?modified_after=%s&active=%s" % (modified_after, active), headers={'Authorization': 'Bearer %s' % ident})
-    print('%s pushes pulled down from server' % len(r.json()['pushes']))
     pushes = [p for p in r.json()['pushes'] if not p['dismissed']]
-    print('%s pushes not dismissed' % len(pushes))
     return pushes
 
 def push_to_s(push):
@@ -35,6 +33,4 @@ def dismiss_push(push, ident):
     payload = {'dismissed': True}
     headers = {'Authorization': 'Bearer %s' % ident, 'Content-Type': 'application/json'}
     r = requests.post("https://api.pushbullet.com/v2/pushes/%s" % push['iden'], headers=headers, data=json.dumps(payload))
-    print(r.status_code)
-    print('dismissed push %s' % push['iden'])
 
