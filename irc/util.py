@@ -3,6 +3,7 @@
 import requests
 import json
 import urllib.parse
+import time
 
 
 def buildmsg(command, arg=None, payload=None):
@@ -37,3 +38,6 @@ def shortlink(url):
     shorturl = resp['data']['url']
 
     return shorturl
+
+def log(data):
+    print("%s %s" % (time.ctime(), data))

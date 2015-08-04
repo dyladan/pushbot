@@ -2,11 +2,10 @@ import asyncio
 import websockets
 import json
 
-from irc.util import buildmsg
 import irc.pb
+import irc.util
 
 loop = asyncio.get_event_loop()
-
 
 class IRCProtocol(asyncio.Protocol):
     def __init__(self, nick, user, name, config={}, channel=None):
@@ -18,6 +17,7 @@ class IRCProtocol(asyncio.Protocol):
         self.response_data = bytes()
 
     def connection_made(self, transport):
+        irc.util.log("connection made")
         self.transport = transport
         asyncio.async(self.monitor_pb())
         self.setnick(self.nick)
@@ -26,24 +26,28 @@ class IRCProtocol(asyncio.Protocol):
             self.join(self.channel)
 
     def setnick(self, nick):
-        nick = buildmsg("NICK", nick)
+        irc.util.log("Set nick: %s" % nick)
+        nick = irc.util.buildmsg("NICK", nick)
         self._send(nick)
 
     def setuser(self, user, name):
-        user = buildmsg("USER", "%s 0 *" % user, name)
+        irc.util.log("Set user: %s" % user)
+        user = irc.util.buildmsg("USER", "%s 0 *" % user, name)
         self._send(user)
 
     def join(self, channel):
-        chan = buildmsg("JOIN", channel)
+        irc.util.log("join %s" % channel)
+        chan = irc.util.buildmsg("JOIN", channel)
         self._send(chan)
 
     def privmsg(self, msg):
         """Send a PRIVMSG"""
+        irc.util.log("saying: %s" % msg)
         tail = None
         if len(msg) > 360:
             tail = msg[360:]
             msg = msg[:360]
-        data = buildmsg("PRIVMSG", self.channel, msg)
+        data = irc.util.buildmsg("PRIVMSG", self.channel, msg)
         self._send(data)
         if tail:
             self.privmsg(chan, tail)
@@ -54,29 +58,36 @@ class IRCProtocol(asyncio.Protocol):
         for line in lines:
             if line[:4] == 'PING':
                 pong_server = line[6:]
-                pong = buildmsg("PONG", pong_server)
+                pong = irc.util.buildmsg("PONG", pong_server)
                 self.transport.write(pong)
 
     def _send(self, data):
-        print("> %s" % data)
         self.transport.write(data)
 
     @asyncio.coroutine
     def monitor_pb(self):
+        first_run = True
+        obj = {}
         ident = self.config['pb_key']
-        websocket = yield from websockets.connect("wss://stream.pushbullet.com/websocket/%s" % ident)
+        url = "wss://stream.pushbullet.com/websocket/%s" % ident
+        websocket = yield from websockets.connect(url)
+        irc.util.log("websocket %s connected" % websocket)
         last = 0
         while True:
             obj = yield from websocket.recv()
             if obj is None:
-                raise Exception('websocket closed')
+                irc.util.log("websocket %s closed" % websocket)
+                irc.util.log("reconnecting")
+                websocket = yield from websockets.connect(url)
+                irc.util.log("websocket %s connected" % websocket)
+                #raise Exception('websocket closed')
             obj = json.loads(obj)
-            if obj['type'] == 'tickle' and obj['subtype'] == 'push':
-                print(obj)
+            if first_run or obj['type'] == 'tickle' and obj['subtype'] == 'push':
+                irc.util.log("event stream recieved %s" % obj)
                 pushes = irc.pb.get_pushes(ident, last)
+                irc.util.log("%s new pushes" % len(pushes))
                 if len(pushes) > 0 and 'modified' in pushes[0]:
                     last = pushes[0]['modified']
-                    print('last modified %s' % last)
                 for push in pushes:
                     ret = irc.pb.push_to_s(push)
                     self.privmsg(ret)
@@ -87,8 +98,9 @@ def main(host, nick, user, name, config={}, channel=None):
     bot = IRCProtocol(nick, user, name, config, channel)
     asyncio.async(loop.create_connection(lambda: bot, host=host, port=6667))
 
-with open('config.json') as f:
-    config = json.loads(f.read())
+if __name__ == "__main__":
+    with open('config.json') as f:
+        config = json.loads(f.read())
 
-loop.call_soon(main, "127.0.0.1", 'pushbot', 'pushbot', 'pushbot', config, "#geekboy")
-loop.run_forever()
+    loop.call_soon(main, "127.0.0.1", 'pushbot', 'pushbot', 'pushbot', config, "#geekboy")
+    loop.run_forever()
