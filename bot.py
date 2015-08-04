@@ -5,10 +5,9 @@ import json
 import irc.pb
 import irc.util
 
-loop = asyncio.get_event_loop()
 
 class IRCProtocol(asyncio.Protocol):
-    def __init__(self, nick, user, name, config={}, channel=None):
+    def __init__(self, nick, user, name, config={}, channel=None, loop=None):
         self.nick = nick
         self.user = user
         self.name = name
@@ -80,9 +79,9 @@ class IRCProtocol(asyncio.Protocol):
                 irc.util.log("reconnecting")
                 websocket = yield from websockets.connect(url)
                 irc.util.log("websocket %s connected" % websocket)
-                #raise Exception('websocket closed')
             obj = json.loads(obj)
             if first_run or obj['type'] == 'tickle' and obj['subtype'] == 'push':
+                first_run = False
                 irc.util.log("event stream recieved %s" % obj)
                 pushes = irc.pb.get_pushes(ident, last)
                 irc.util.log("%s new pushes" % len(pushes))
@@ -94,13 +93,24 @@ class IRCProtocol(asyncio.Protocol):
                     irc.pb.dismiss_push(push, ident)
 
 
-def main(host, nick, user, name, config={}, channel=None):
-    bot = IRCProtocol(nick, user, name, config, channel)
-    asyncio.async(loop.create_connection(lambda: bot, host=host, port=6667))
-
-if __name__ == "__main__":
+def main():
     with open('config.json') as f:
         config = json.loads(f.read())
+    host = "127.0.0.1"
+    port = 6667
 
-    loop.call_soon(main, "127.0.0.1", 'pushbot', 'pushbot', 'pushbot', config, "#geekboy")
+    nick = "pushbot"
+    user = "pushbot"
+    name = "pushbot"
+    channel = "#geekboy"
+
+    loop = asyncio.get_event_loop()
+
+    bot = IRCProtocol(nick, user, name, config, channel, loop)
+    coro = loop.create_connection(lambda: bot, host=host, port=port)
+
+    loop.run_until_complete(coro)
     loop.run_forever()
+
+if __name__ == "__main__":
+    main()
