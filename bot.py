@@ -7,12 +7,8 @@ import irc.aiopb
 
 
 class IRCProtocol(asyncio.Protocol):
-    def __init__(self, nick, user, name, config, channel, loop):
-        self.nick = nick
-        self.user = user
-        self.name = name
+    def __init__(self, config, loop):
         self.config = config
-        self.channel = channel
         self.loop = loop
         self.response_data = bytes()
 
@@ -20,9 +16,9 @@ class IRCProtocol(asyncio.Protocol):
         irc.util.log("connection made")
         self.transport = transport
         asyncio.async(self.monitor_pb())
-        self.setnick(self.nick)
-        self.setuser(self.user, self.name)
-        self.join(self.channel)
+        self.setnick(self.config['nick'])
+        self.setuser(self.config['user'], self.config['name'])
+        self.join(self.config['channel'])
 
     def data_received(self, data):
         self.response_data = data
@@ -55,7 +51,7 @@ class IRCProtocol(asyncio.Protocol):
         if len(msg) > 360:
             tail = msg[360:]
             msg = msg[:360]
-        data = irc.util.buildmsg("PRIVMSG", self.channel, msg)
+        data = irc.util.buildmsg("PRIVMSG", self.config['channel'], msg)
         self.transport.write(data)
         if tail:
             self.privmsg(chan, tail)
@@ -101,14 +97,9 @@ def main():
     host = "127.0.0.1"
     port = 6667
 
-    nick = "pushbot"
-    user = "pushbot"
-    name = "pushbot"
-    channel = "#geekboy"
-
     loop = asyncio.get_event_loop()
 
-    bot = IRCProtocol(nick, user, name, config, channel, loop)
+    bot = IRCProtocol(config, loop)
     coro = loop.create_connection(lambda: bot, host=host, port=port)
 
     loop.run_until_complete(coro)

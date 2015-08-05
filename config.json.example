@@ -1,4 +1,9 @@
 {
+  "nick": "pushbot",
+  "user": "pushbot",
+  "name": "pushbot",
+  "channel": "#test",
+
   "pb_key": "pushbullet key",
   "bitly_key": "bitly key"
 }
