@@ -94,8 +94,8 @@ class IRCProtocol(asyncio.Protocol):
 def main():
     with open('config.json') as f:
         config = json.loads(f.read())
-    host = "127.0.0.1"
-    port = 6667
+    host = config['host']
+    port = config['port']
 
     loop = asyncio.get_event_loop()
 
