@@ -1,12 +1,20 @@
+import aiohttp
 import requests
+import asyncio
 import json
 from irc.util import shortlink
 
+@asyncio.coroutine
 def get_pushes(ident, modified_after=0, active='true'):
-    r = requests.get("https://api.pushbullet.com/v2/pushes?modified_after=%s&active=%s" % (modified_after, active), headers={'Authorization': 'Bearer %s' % ident})
-    pushes = [p for p in r.json()['pushes'] if not p['dismissed']]
+    url = "https://api.pushbullet.com/v2/pushes?modified_after=%s&active=%s" % (modified_after, active)
+    headers={'Authorization': 'Bearer %s' % ident}
+    response = yield from aiohttp.get(url, headers=headers)
+    assert response.status == 200
+    content = yield from response.json()
+    pushes = [p for p in content['pushes'] if not p['dismissed']]
     return pushes
 
+@asyncio.coroutine
 def push_to_s(push):
     sender = push['sender_email_normalized']
     if push['type'] == 'note':
@@ -29,8 +37,14 @@ def push_to_s(push):
         shorturl = shortlink(url)
         return('<%s> (%s) - %s' % (sender, filename, shorturl))
 
+@asyncio.coroutine
 def dismiss_push(push, ident):
+    url = "https://api.pushbullet.com/v2/pushes/%s" % push['iden']
     payload = {'dismissed': True}
-    headers = {'Authorization': 'Bearer %s' % ident, 'Content-Type': 'application/json'}
-    r = requests.post("https://api.pushbullet.com/v2/pushes/%s" % push['iden'], headers=headers, data=json.dumps(payload))
+    headers = {
+        'Authorization': 'Bearer %s' % ident,
+        'Content-Type': 'application/json'
+    }
+    r = yield from aiohttp.request('post', url, headers=headers, data=json.dumps(payload))
+    return r.status
 
