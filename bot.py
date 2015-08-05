@@ -7,12 +7,13 @@ import irc.util
 
 
 class IRCProtocol(asyncio.Protocol):
-    def __init__(self, nick, user, name, config={}, channel=None, loop=None):
+    def __init__(self, nick, user, name, config, channel, loop):
         self.nick = nick
         self.user = user
         self.name = name
-        self.channel = channel
         self.config = config
+        self.channel = channel
+        self.loop = loop
         self.response_data = bytes()
 
     def connection_made(self, transport):
@@ -21,8 +22,7 @@ class IRCProtocol(asyncio.Protocol):
         asyncio.async(self.monitor_pb())
         self.setnick(self.nick)
         self.setuser(self.user, self.name)
-        if self.channel:
-            self.join(self.channel)
+        self.join(self.channel)
 
     def setnick(self, nick):
         irc.util.log("Set nick: %s" % nick)
@@ -83,7 +83,8 @@ class IRCProtocol(asyncio.Protocol):
             if first_run or obj['type'] == 'tickle' and obj['subtype'] == 'push':
                 first_run = False
                 irc.util.log("event stream recieved %s" % obj)
-                pushes = irc.pb.get_pushes(ident, last)
+                pushes = yield from self.loop.run_in_executor(None, irc.pb.get_pushes, ident, last)
+                #pushes = irc.pb.get_pushes(ident, last)
                 irc.util.log("%s new pushes" % len(pushes))
                 if len(pushes) > 0 and 'modified' in pushes[0]:
                     last = pushes[0]['modified']
@@ -91,6 +92,8 @@ class IRCProtocol(asyncio.Protocol):
                     ret = irc.pb.push_to_s(push)
                     self.privmsg(ret)
                     irc.pb.dismiss_push(push, ident)
+                    yield from self.loop.run_in_executor(None, irc.pb.dismiss_push, push, ident)
+                    #irc.pb.dismiss_push(push, ident)
 
 
 def main():
